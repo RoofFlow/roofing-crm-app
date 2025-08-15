@@ -111,6 +111,35 @@ button:hover {
   color: #f2f2f3;
 }
 
+/*
+ * Make the form inside the modal scrollable. Without this, tall forms (like the lead
+ * editor with photos, contract generation, crew assignment, etc.) can push action
+ * buttons off the screen. Setting a max-height tied to the viewport allows the
+ * content to scroll within the panel so that the Save/Next/Delete buttons remain
+ * reachable at the bottom of the modal.
+ */
+/*
+ * Make the entire modal panel scrollable rather than just the form. When the content
+ * inside the modal grows tall (due to sections for photos, contracts, crew etc.),
+ * the bottom action buttons should remain accessible without zooming out. Setting
+ * a max-height tied to the viewport on the panel itself allows the user to scroll
+ * the panel contents. Overflow on the panel ensures inner elements (forms,
+ * lists, etc.) scroll together.
+ */
+.modal .panel {
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Ensure forms inside the modal don’t specify their own max-height to avoid
+ * conflicting scroll containers. Removing explicit max-height and overflow here
+ * lets the panel control scrolling.
+ */
+.modal .panel form {
+  max-height: none;
+  overflow: visible;
+}
+
 .modal h2 {
   margin-top: 0;
 }
@@ -153,4 +182,17 @@ button:hover {
 
 .hidden {
   display: none;
+}
+
+/* Lists for photos and crew assignments */
+#photo-list,
+#crew-list {
+  margin-top: 0.5rem;
+  padding-left: 1.25rem;
+  list-style-type: disc;
+}
+
+#photo-list li,
+#crew-list li {
+  margin-bottom: 0.25rem;
 }
