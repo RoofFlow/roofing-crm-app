@@ -8,6 +8,27 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Track current user and role for data filtering
+  let currentUser = null;
+  let currentRole = 'user';
+
+  // Fetch the current user and profile role from Supabase
+  async function getUserAndRole() {
+    const { data: { user } } = await supabase.auth.getUser();
+    currentUser = user;
+    currentRole = 'user';
+    if (user) {
+      const { data: profileData } = await supabase
+        .from('profile')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      if (profileData && profileData.role) {
+        currentRole = profileData.role;
+      }
+    }
+  }
+
   const stages = ['new', 'inspection', 'estimate', 'insurance', 'job', 'complete'];
   const stageTitles = {
     new: 'New Lead',
@@ -42,10 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Fetch leads from Supabase
   async function fetchLeads() {
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .order('created_at', { ascending: true });
+    let query = supabase.from('leads').select('*').order('created_at', { ascending: true });
+    // Restrict leads to the current user unless admin
+    if (currentRole !== 'admin' && currentUser) {
+      query = query.eq('owner_id', currentUser.id);
+    }
+    const { data, error } = await query;
     if (error) {
       console.error('Error fetching leads', error);
       return [];
@@ -92,16 +115,23 @@ document.addEventListener('DOMContentLoaded', () => {
         email,
         address,
         stage: 'new',
-        roofType: '',
-        roofPitch: '',
-        squares: '',
-        claimNumber: '',
+        owner_id: currentUser ? currentUser.id : null,
+        // Use lower‑case column names to match the Supabase schema
+        rooftype: '',
+        roofpitch: '',
+        // Use null for numeric fields so Postgres numeric columns accept the value
+        squares: null,
+        claimnumber: '',
         carrier: '',
-        deductible: '',
-        rcv: '',
-        acv: '',
-        depreciation: '',
-        supplement: ''
+        deductible: null,
+        rcv: null,
+        acv: null,
+        depreciation: null,
+        supplement: null,
+        claim_status: 'Not Filed',
+        payment_status: 'Unpaid',
+        doc_url: '',
+        photo_report_url: ''
       });
     if (error) {
       alert('Error adding lead: ' + error.message);
@@ -120,16 +150,42 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('edit-phone').value = lead.phone;
     document.getElementById('edit-email').value = lead.email || '';
     document.getElementById('edit-address').value = lead.address || '';
-    document.getElementById('edit-roofType').value = lead.roofType || '';
-    document.getElementById('edit-roofPitch').value = lead.roofPitch || '';
+    // Use lower‑case properties from Supabase for roof and claim fields
+    document.getElementById('edit-roofType').value = lead.rooftype || '';
+    document.getElementById('edit-roofPitch').value = lead.roofpitch || '';
     document.getElementById('edit-squares').value = lead.squares || '';
-    document.getElementById('edit-claimNumber').value = lead.claimNumber || '';
+    document.getElementById('edit-claimNumber').value = lead.claimnumber || '';
     document.getElementById('edit-carrier').value = lead.carrier || '';
     document.getElementById('edit-deductible').value = lead.deductible || '';
     document.getElementById('edit-rcv').value = lead.rcv || '';
     document.getElementById('edit-acv').value = lead.acv || '';
     document.getElementById('edit-depreciation').value = lead.depreciation || '';
     document.getElementById('edit-supplement').value = lead.supplement || '';
+    // Set claim and payment statuses
+    const claimStatusSelect = document.getElementById('edit-claimStatus');
+    if (claimStatusSelect) claimStatusSelect.value = lead.claim_status || 'Not Filed';
+    const paymentStatusSelect = document.getElementById('edit-paymentStatus');
+    if (paymentStatusSelect) paymentStatusSelect.value = lead.payment_status || 'Unpaid';
+
+    // Show existing contract link if available
+    const contractLink = document.getElementById('download-contract-link');
+    if (contractLink) {
+      if (lead.doc_url) {
+        const pub = supabase.storage.from('documents').getPublicUrl(lead.doc_url);
+        if (pub.data && pub.data.publicUrl) {
+          contractLink.href = pub.data.publicUrl;
+          contractLink.style.display = 'inline';
+        } else {
+          contractLink.style.display = 'none';
+        }
+      } else {
+        contractLink.style.display = 'none';
+      }
+    }
+
+    // Load photos and crew assignments
+    loadPhotos(lead.id);
+    loadCrewAssignments(lead.id);
     // Save current stage index for advancement
     modal.dataset.stage = lead.stage;
   }
@@ -148,16 +204,20 @@ document.addEventListener('DOMContentLoaded', () => {
       phone: document.getElementById('edit-phone').value.trim(),
       email: document.getElementById('edit-email').value.trim(),
       address: document.getElementById('edit-address').value.trim(),
-      roofType: document.getElementById('edit-roofType').value.trim(),
-      roofPitch: document.getElementById('edit-roofPitch').value.trim(),
+      // Use lower‑case property names to match Supabase columns
+      rooftype: document.getElementById('edit-roofType').value.trim(),
+      roofpitch: document.getElementById('edit-roofPitch').value.trim(),
       squares: document.getElementById('edit-squares').value.trim(),
-      claimNumber: document.getElementById('edit-claimNumber').value.trim(),
+      claimnumber: document.getElementById('edit-claimNumber').value.trim(),
       carrier: document.getElementById('edit-carrier').value.trim(),
       deductible: document.getElementById('edit-deductible').value.trim(),
       rcv: document.getElementById('edit-rcv').value.trim(),
       acv: document.getElementById('edit-acv').value.trim(),
       depreciation: document.getElementById('edit-depreciation').value.trim(),
-      supplement: document.getElementById('edit-supplement').value.trim()
+      supplement: document.getElementById('edit-supplement').value.trim(),
+      // save claim and payment statuses
+      claim_status: document.getElementById('edit-claimStatus').value,
+      payment_status: document.getElementById('edit-paymentStatus').value
     };
     const { error } = await supabase
       .from('leads')
@@ -207,6 +267,227 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Photo upload handler
+  const photoUploadInput = document.getElementById('photo-upload');
+  if (photoUploadInput) {
+    photoUploadInput.addEventListener('change', async (e) => {
+      const leadId = document.getElementById('edit-id').value;
+      const files = Array.from(e.target.files);
+      for (const file of files) {
+        const filePath = `${leadId}/${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage.from('Photos').upload(filePath, file);
+        if (!uploadError) {
+          await supabase.from('photos').insert({ lead_id: leadId, type: 'photo', url: filePath });
+        } else {
+          alert('Error uploading photo: ' + uploadError.message);
+        }
+      }
+      // refresh list
+      loadPhotos(leadId);
+      // reset file input
+      e.target.value = '';
+    });
+  }
+
+  // Generate photo report
+  const generatePhotoReportBtn = document.getElementById('generate-photo-report');
+  if (generatePhotoReportBtn) {
+    generatePhotoReportBtn.addEventListener('click', async () => {
+      const leadId = document.getElementById('edit-id').value;
+      // Get photos for lead
+      const { data: photos, error: photoErr } = await supabase.from('photos').select('*').eq('lead_id', leadId);
+      if (photoErr || !photos || photos.length === 0) {
+        alert('No photos to include in the report.');
+        return;
+      }
+      try {
+        const pdfDoc = await PDFLib.PDFDocument.create();
+        for (const photo of photos) {
+          const { data: pub } = supabase.storage.from('Photos').getPublicUrl(photo.url);
+          if (pub && pub.publicUrl) {
+            const response = await fetch(pub.publicUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const imageBytes = new Uint8Array(arrayBuffer);
+            let image;
+            let dims;
+            if (photo.url.toLowerCase().endsWith('.png')) {
+              image = await pdfDoc.embedPng(imageBytes);
+              dims = image.scale(0.5);
+            } else {
+              image = await pdfDoc.embedJpg(imageBytes);
+              dims = image.scale(0.5);
+            }
+            const page = pdfDoc.addPage([612, 792]);
+            const { width, height } = dims;
+            // Center image on page
+            const x = (612 - width) / 2;
+            const y = (792 - height) / 2;
+            page.drawImage(image, { x, y, width, height });
+          }
+        }
+        const pdfBytes = await pdfDoc.save();
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const reportPath = `${leadId}/${Date.now()}-photo_report.pdf`;
+        const { error: uploadErr } = await supabase.storage.from('documents').upload(reportPath, pdfBlob);
+        if (uploadErr) {
+          alert('Error uploading photo report: ' + uploadErr.message);
+          return;
+        }
+        await supabase.from('leads').update({ photo_report_url: reportPath }).eq('id', leadId);
+        alert('Photo report generated.');
+      } catch (err) {
+        alert('Error generating photo report: ' + err.message);
+      }
+    });
+  }
+
+  // Generate contract
+  const generateContractBtn = document.getElementById('generate-contract');
+  if (generateContractBtn) {
+    generateContractBtn.addEventListener('click', async () => {
+      const leadId = document.getElementById('edit-id').value;
+      // Collect current values from modal
+      const leadData = {
+        name: document.getElementById('edit-name').value.trim(),
+        phone: document.getElementById('edit-phone').value.trim(),
+        email: document.getElementById('edit-email').value.trim(),
+        address: document.getElementById('edit-address').value.trim(),
+        rooftype: document.getElementById('edit-roofType').value.trim(),
+        roofpitch: document.getElementById('edit-roofPitch').value.trim(),
+        squares: document.getElementById('edit-squares').value.trim(),
+        claimnumber: document.getElementById('edit-claimNumber').value.trim(),
+        carrier: document.getElementById('edit-carrier').value.trim(),
+        deductible: document.getElementById('edit-deductible').value.trim(),
+        rcv: document.getElementById('edit-rcv').value.trim(),
+        acv: document.getElementById('edit-acv').value.trim(),
+        depreciation: document.getElementById('edit-depreciation').value.trim(),
+        supplement: document.getElementById('edit-supplement').value.trim()
+      };
+      try {
+        const pdfDoc = await PDFLib.PDFDocument.create();
+        const page = pdfDoc.addPage([612, 792]);
+        const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+        let y = 760;
+        const fontSize = 12;
+        const lines = [
+          'Roofing Contract',
+          '',
+          `Homeowner: ${leadData.name}`,
+          `Phone: ${leadData.phone}`,
+          `Email: ${leadData.email}`,
+          `Address: ${leadData.address}`,
+          '',
+          `Roof Type: ${leadData.rooftype}`,
+          `Roof Pitch: ${leadData.roofpitch}`,
+          `Squares: ${leadData.squares}`,
+          '',
+          `Claim Number: ${leadData.claimnumber}`,
+          `Carrier: ${leadData.carrier}`,
+          `Deductible: ${leadData.deductible}`,
+          `RCV: ${leadData.rcv}`,
+          `ACV: ${leadData.acv}`,
+          `Depreciation: ${leadData.depreciation}`,
+          `Supplement: ${leadData.supplement}`,
+          '',
+          'Thank you for choosing our roofing services.'
+        ];
+        lines.forEach(text => {
+          page.drawText(text, { x: 50, y, size: fontSize, font });
+          y -= fontSize + 4;
+        });
+        const pdfBytes = await pdfDoc.save();
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const docPath = `${leadId}/${Date.now()}-contract.pdf`;
+        const { error: uploadErr } = await supabase.storage.from('documents').upload(docPath, pdfBlob);
+        if (uploadErr) {
+          alert('Error uploading contract: ' + uploadErr.message);
+          return;
+        }
+        // Update leads table with doc URL
+        await supabase.from('leads').update({ doc_url: docPath }).eq('id', leadId);
+        // Update link in modal
+        const { data: pub } = supabase.storage.from('documents').getPublicUrl(docPath);
+        const contractLink = document.getElementById('download-contract-link');
+        if (contractLink && pub && pub.publicUrl) {
+          contractLink.href = pub.publicUrl;
+          contractLink.style.display = 'inline';
+        }
+        alert('Contract generated.');
+      } catch (err) {
+        alert('Error generating contract: ' + err.message);
+      }
+    });
+  }
+
+  // Crew assignment
+  const assignCrewBtn = document.getElementById('assign-crew');
+  if (assignCrewBtn) {
+    assignCrewBtn.addEventListener('click', async () => {
+      const leadId = document.getElementById('edit-id').value;
+      const crewName = document.getElementById('crew-name').value.trim();
+      const crewDate = document.getElementById('crew-date').value;
+      const crewNotes = document.getElementById('crew-notes').value.trim();
+      if (!crewName) {
+        alert('Crew name is required.');
+        return;
+      }
+      const { error: assignErr } = await supabase.from('crew_assignments').insert({
+        lead_id: leadId,
+        crew_name: crewName,
+        date: crewDate || null,
+        notes: crewNotes
+      });
+      if (assignErr) {
+        alert('Error assigning crew: ' + assignErr.message);
+        return;
+      }
+      // Clear inputs
+      document.getElementById('crew-name').value = '';
+      document.getElementById('crew-date').value = '';
+      document.getElementById('crew-notes').value = '';
+      loadCrewAssignments(leadId);
+    });
+  }
+
+  // Load photos for a lead
+  async function loadPhotos(leadId) {
+    const photoList = document.getElementById('photo-list');
+    if (!photoList) return;
+    photoList.innerHTML = '';
+    const { data: photos, error } = await supabase.from('photos').select('*').eq('lead_id', leadId);
+    if (error || !photos) return;
+    for (const photo of photos) {
+      const { data: pub } = supabase.storage.from('Photos').getPublicUrl(photo.url);
+      if (pub && pub.publicUrl) {
+        const li = document.createElement('li');
+        const a = document.createElement('a');
+        a.href = pub.publicUrl;
+        a.textContent = photo.url.split('/').pop();
+        a.target = '_blank';
+        li.appendChild(a);
+        photoList.appendChild(li);
+      }
+    }
+  }
+
+  // Load crew assignments for a lead
+  async function loadCrewAssignments(leadId) {
+    const crewList = document.getElementById('crew-list');
+    if (!crewList) return;
+    crewList.innerHTML = '';
+    const { data: assignments, error } = await supabase.from('crew_assignments')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('date', { ascending: true });
+    if (error || !assignments) return;
+    assignments.forEach(a => {
+      const li = document.createElement('li');
+      const dateStr = a.date ? a.date.toString().substring(0, 10) : '';
+      li.textContent = `${a.crew_name} - ${dateStr} ${a.notes ? '- ' + a.notes : ''}`;
+      crewList.appendChild(li);
+    });
+  }
+
   // Export CSV
   document.getElementById('export-csv').addEventListener('click', async () => {
     const leads = await fetchLeads();
@@ -214,7 +495,8 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('No leads to export.');
       return;
     }
-    const headers = ['id','name','phone','email','address','stage','roofType','roofPitch','squares','claimNumber','carrier','deductible','rcv','acv','depreciation','supplement'];
+    // Use lower‑case header names to match Supabase columns
+    const headers = ['id','name','phone','email','address','stage','rooftype','roofpitch','squares','claimnumber','carrier','deductible','rcv','acv','depreciation','supplement'];
     const rows = leads.map(l => headers.map(h => (l[h] ? String(l[h]).replace(/,/g, ' ') : '')).join(','));
     const csvContent = [headers.join(','), ...rows].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -240,7 +522,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderLeads(leads);
   }
 
-  // Initialize
-  buildColumns();
-  loadAndRender();
+  // Initialize: fetch user & role then build board
+  getUserAndRole().then(() => {
+    buildColumns();
+    loadAndRender();
+  });
 });
