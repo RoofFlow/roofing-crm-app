@@ -1,0 +1,9 @@
+{
+  "name": "Roofing CRM",
+  "short_name": "RoofingCRM",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f0f10",
+  "theme_color": "#000000",
+  "description": "A roofing-first CRM for leads, claims and jobs"
+}
