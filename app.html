@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roofing CRM – Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="supa.js"></script>
+  <script defer src="app.js"></script>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <header class="header">
+    <h1>Roofing CRM</h1>
+    <button id="sign-out">Sign Out</button>
+  </header>
+  <div class="container">
+    <div class="toolbar">
+      <h2>Add New Lead</h2>
+      <button id="export-csv">Export CSV</button>
+    </div>
+    <form id="lead-form" class="card">
+      <input type="text" id="lead-name" placeholder="Homeowner Name" required>
+      <input type="text" id="lead-phone" placeholder="Phone" required>
+      <input type="email" id="lead-email" placeholder="Email">
+      <input type="text" id="lead-address" placeholder="Address">
+      <button type="submit">Add Lead</button>
+    </form>
+    <div class="board" id="pipeline-board">
+      <!-- Columns populated by app.js -->
+    </div>
+  </div>
+
+  <!-- Modal for editing lead details -->
+  <div class="modal" id="lead-modal">
+    <div class="panel">
+      <h2>Edit Lead</h2>
+      <form id="edit-lead-form">
+        <input type="hidden" id="edit-id">
+        <label>Name
+          <input type="text" id="edit-name" required>
+        </label>
+        <label>Phone
+          <input type="text" id="edit-phone" required>
+        </label>
+        <label>Email
+          <input type="email" id="edit-email">
+        </label>
+        <label>Address
+          <input type="text" id="edit-address">
+        </label>
+        <h3>Property Info</h3>
+        <label>Roof Type
+          <input type="text" id="edit-roofType">
+        </label>
+        <label>Roof Pitch
+          <input type="text" id="edit-roofPitch">
+        </label>
+        <label>Squares
+          <input type="number" id="edit-squares" step="0.1" min="0">
+        </label>
+        <h3>Claim Info</h3>
+        <label>Claim Number
+          <input type="text" id="edit-claimNumber">
+        </label>
+        <label>Carrier
+          <input type="text" id="edit-carrier">
+        </label>
+        <label>Deductible
+          <input type="number" id="edit-deductible" step="0.01" min="0">
+        </label>
+        <label>RCV
+          <input type="number" id="edit-rcv" step="0.01" min="0">
+        </label>
+        <label>ACV
+          <input type="number" id="edit-acv" step="0.01" min="0">
+        </label>
+        <label>Depreciation
+          <input type="number" id="edit-depreciation" step="0.01" min="0">
+        </label>
+        <label>Supplement Total
+          <input type="number" id="edit-supplement" step="0.01" min="0">
+        </label>
+        <div class="modal-actions">
+          <button type="button" id="save-lead">Save</button>
+          <button type="button" id="advance-lead">Next Stage</button>
+          <button type="button" id="delete-lead">Delete</button>
+          <button type="button" id="cancel-lead">Close</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>
