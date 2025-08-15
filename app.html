@@ -3,9 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roofing CRM – Dashboard</title>
+  <title>Roof Flow CRM – Dashboard</title>
   <link rel="stylesheet" href="style.css">
   <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- PDFLib for generating PDFs -->
+  <script defer src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
   <script defer src="config.js"></script>
   <script defer src="supa.js"></script>
   <script defer src="app.js"></script>
@@ -13,7 +15,7 @@
 </head>
 <body>
   <header class="header">
-    <h1>Roofing CRM</h1>
+    <h1>Roof Flow CRM</h1>
     <button id="sign-out">Sign Out</button>
   </header>
   <div class="container">
@@ -22,9 +24,9 @@
       <button id="export-csv">Export CSV</button>
     </div>
     <form id="lead-form" class="card">
-      <input type="text" id="lead-name" placeholder="Homeowner Name" required>
-      <input type="text" id="lead-phone" placeholder="Phone" required>
-      <input type="email" id="lead-email" placeholder="Email">
+      <input type="text" id="lead-name" placeholder="Homeowner Name">
+      <input type="text" id="lead-phone" placeholder="Phone">
+      <input type="text" id="lead-email" placeholder="Email">
       <input type="text" id="lead-address" placeholder="Address">
       <button type="submit">Add Lead</button>
     </form>
@@ -83,6 +85,52 @@
         <label>Supplement Total
           <input type="number" id="edit-supplement" step="0.01" min="0">
         </label>
+
+        <!-- New section: Claim and Payment Status -->
+        <h3>Status</h3>
+        <label>Claim Status
+          <select id="edit-claimStatus">
+            <option value="Not Filed">Not Filed</option>
+            <option value="Filed">Filed</option>
+            <option value="Approved">Approved</option>
+            <option value="Supplements Filed">Supplements Filed</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </label>
+        <label>Payment Status
+          <select id="edit-paymentStatus">
+            <option value="Unpaid">Unpaid</option>
+            <option value="Partially Paid">Partially Paid</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </label>
+
+        <!-- New section: File uploads and reports -->
+        <h3>Files & Reports</h3>
+        <label>Upload Photos
+          <input type="file" id="photo-upload" accept="image/*" multiple>
+        </label>
+        <ul id="photo-list"></ul>
+        <button type="button" id="generate-photo-report">Generate Photo Report</button>
+
+        <!-- New section: Contract generation -->
+        <h3>Documents</h3>
+        <button type="button" id="generate-contract">Generate Contract</button>
+        <a id="download-contract-link" href="#" target="_blank" style="display:none">View Contract</a>
+
+        <!-- New section: Crew assignment -->
+        <h3>Crew Assignment</h3>
+        <label>Crew Name
+          <input type="text" id="crew-name">
+        </label>
+        <label>Scheduled Date
+          <input type="date" id="crew-date">
+        </label>
+        <label>Notes
+          <input type="text" id="crew-notes">
+        </label>
+        <button type="button" id="assign-crew">Assign Crew</button>
+        <ul id="crew-list"></ul>
         <div class="modal-actions">
           <button type="button" id="save-lead">Save</button>
           <button type="button" id="advance-lead">Next Stage</button>
