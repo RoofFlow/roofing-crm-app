@@ -1,6 +1,6 @@
 {
-  "name": "Roofing CRM",
-  "short_name": "RoofingCRM",
+  "name": "Roof Flow CRM",
+  "short_name": "RoofFlowCRM",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0f0f10",
