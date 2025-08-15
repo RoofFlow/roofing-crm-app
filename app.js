@@ -207,14 +207,32 @@ document.addEventListener('DOMContentLoaded', () => {
       // Use lower‑case property names to match Supabase columns
       rooftype: document.getElementById('edit-roofType').value.trim(),
       roofpitch: document.getElementById('edit-roofPitch').value.trim(),
-      squares: document.getElementById('edit-squares').value.trim(),
+      squares: (() => {
+        const val = document.getElementById('edit-squares').value.trim();
+        return val === '' ? null : parseFloat(val);
+      })(),
       claimnumber: document.getElementById('edit-claimNumber').value.trim(),
       carrier: document.getElementById('edit-carrier').value.trim(),
-      deductible: document.getElementById('edit-deductible').value.trim(),
-      rcv: document.getElementById('edit-rcv').value.trim(),
-      acv: document.getElementById('edit-acv').value.trim(),
-      depreciation: document.getElementById('edit-depreciation').value.trim(),
-      supplement: document.getElementById('edit-supplement').value.trim(),
+      deductible: (() => {
+        const val = document.getElementById('edit-deductible').value.trim();
+        return val === '' ? null : parseFloat(val);
+      })(),
+      rcv: (() => {
+        const val = document.getElementById('edit-rcv').value.trim();
+        return val === '' ? null : parseFloat(val);
+      })(),
+      acv: (() => {
+        const val = document.getElementById('edit-acv').value.trim();
+        return val === '' ? null : parseFloat(val);
+      })(),
+      depreciation: (() => {
+        const val = document.getElementById('edit-depreciation').value.trim();
+        return val === '' ? null : parseFloat(val);
+      })(),
+      supplement: (() => {
+        const val = document.getElementById('edit-supplement').value.trim();
+        return val === '' ? null : parseFloat(val);
+      })(),
       // save claim and payment statuses
       claim_status: document.getElementById('edit-claimStatus').value,
       payment_status: document.getElementById('edit-paymentStatus').value
@@ -274,10 +292,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const leadId = document.getElementById('edit-id').value;
       const files = Array.from(e.target.files);
       for (const file of files) {
-        const filePath = `${leadId}/${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage.from('Photos').upload(filePath, file);
+        // store photo under user/uid/leads/leadId/
+        const basePathPhoto = currentUser ? `user/${currentUser.id}/leads/${leadId}/` : `${leadId}/`;
+        const filePath = `${basePathPhoto}${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage.from('Photos').upload(filePath, file, { upsert: true });
         if (!uploadError) {
-          await supabase.from('photos').insert({ lead_id: leadId, type: 'photo', url: filePath });
+          await supabase.from('photos').insert({ lead_id: leadId, owner_id: currentUser ? currentUser.id : null, name: file.name, url: filePath });
         } else {
           alert('Error uploading photo: ' + uploadError.message);
         }
@@ -327,13 +347,22 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const pdfBytes = await pdfDoc.save();
         const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-        const reportPath = `${leadId}/${Date.now()}-photo_report.pdf`;
-        const { error: uploadErr } = await supabase.storage.from('documents').upload(reportPath, pdfBlob);
+        // Store photo report under user/uid/leads/leadId/ path
+        const basePath2 = currentUser ? `user/${currentUser.id}/leads/${leadId}/` : `${leadId}/`;
+        const reportPath = `${basePath2}${Date.now()}-photo_report.pdf`;
+        const { error: uploadErr } = await supabase.storage.from('documents').upload(reportPath, pdfBlob, { upsert: true });
         if (uploadErr) {
           alert('Error uploading photo report: ' + uploadErr.message);
           return;
         }
         await supabase.from('leads').update({ photo_report_url: reportPath }).eq('id', leadId);
+        // Insert a document entry for the photo report
+        await supabase.from('documents').insert({
+          lead_id: leadId,
+          owner_id: currentUser ? currentUser.id : null,
+          name: 'Photo Report',
+          url: reportPath
+        });
         alert('Photo report generated.');
       } catch (err) {
         alert('Error generating photo report: ' + err.message);
@@ -397,14 +426,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         const pdfBytes = await pdfDoc.save();
         const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
-        const docPath = `${leadId}/${Date.now()}-contract.pdf`;
-        const { error: uploadErr } = await supabase.storage.from('documents').upload(docPath, pdfBlob);
+        // Store contract under user/uid/leads/leadId/ to satisfy storage RLS policies
+        const basePath = currentUser ? `user/${currentUser.id}/leads/${leadId}/` : `${leadId}/`;
+        const docPath = `${basePath}${Date.now()}-contract.pdf`;
+        const { error: uploadErr } = await supabase.storage.from('documents').upload(docPath, pdfBlob, { upsert: true });
         if (uploadErr) {
           alert('Error uploading contract: ' + uploadErr.message);
           return;
         }
         // Update leads table with doc URL
         await supabase.from('leads').update({ doc_url: docPath }).eq('id', leadId);
+        // Insert document row
+        await supabase.from('documents').insert({
+          lead_id: leadId,
+          owner_id: currentUser ? currentUser.id : null,
+          name: 'Contract',
+          url: docPath
+        });
         // Update link in modal
         const { data: pub } = supabase.storage.from('documents').getPublicUrl(docPath);
         const contractLink = document.getElementById('download-contract-link');
@@ -434,7 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const { error: assignErr } = await supabase.from('crew_assignments').insert({
         lead_id: leadId,
         crew_name: crewName,
-        date: crewDate || null,
+        // Use scheduled_date to match the column name in the database
+        scheduled_date: crewDate || null,
         notes: crewNotes
       });
       if (assignErr) {
@@ -478,11 +517,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const { data: assignments, error } = await supabase.from('crew_assignments')
       .select('*')
       .eq('lead_id', leadId)
-      .order('date', { ascending: true });
+      // Order by scheduled_date to match the field name
+      .order('scheduled_date', { ascending: true });
     if (error || !assignments) return;
     assignments.forEach(a => {
       const li = document.createElement('li');
-      const dateStr = a.date ? a.date.toString().substring(0, 10) : '';
+      // Use scheduled_date when displaying the date
+      const dateVal = a.scheduled_date || a.date || null;
+      const dateStr = dateVal ? dateVal.toString().substring(0, 10) : '';
       li.textContent = `${a.crew_name} - ${dateStr} ${a.notes ? '- ' + a.notes : ''}`;
       crewList.appendChild(li);
     });
