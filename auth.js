@@ -51,6 +51,12 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Account created. Please check your email to confirm.');
       // After sign up, sign in automatically
       await supabase.auth.signInWithPassword({ email, password });
+      // Create a profile record for the new user with default role 'user'
+      const { data: { user: newUser } } = await supabase.auth.getUser();
+      if (newUser) {
+        // Insert into profile table only if not exists
+        await supabase.from('profile').upsert({ id: newUser.id, role: 'user' });
+      }
       window.location.href = 'app.html';
     } catch (err) {
       alert(err.message || 'Sign up failed');
