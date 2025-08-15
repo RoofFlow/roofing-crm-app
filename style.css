@@ -1,0 +1,156 @@
+/* Roofing CRM Styles – black, grey, white palette */
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #0f0f10;
+  color: #f2f2f3;
+}
+
+.header {
+  background-color: #000;
+  color: #fff;
+  padding: 1rem;
+  text-align: center;
+}
+
+.container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.card {
+  background-color: #1a1b1d;
+  border: 1px solid #2a2b2e;
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+input,
+button {
+  width: 100%;
+  padding: 0.6rem;
+  margin-bottom: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #2a2b2e;
+  background-color: #111;
+  color: #f2f2f3;
+}
+
+button {
+  background-color: #2b2d31;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #3a3c41;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.stage {
+  background-color: #1a1b1d;
+  border: 1px solid #2a2b2e;
+  border-radius: 12px;
+  padding: 0.5rem;
+  min-height: 250px;
+}
+
+.stage h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  color: #c9cacc;
+}
+
+.lead {
+  background-color: #232427;
+  border: 1px solid #2b2d31;
+  border-radius: 10px;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+  color: #f2f2f3;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.show {
+  display: flex;
+}
+
+.modal .panel {
+  background-color: #1a1b1d;
+  border: 1px solid #2a2b2e;
+  border-radius: 12px;
+  padding: 1rem;
+  width: min(600px, 95vw);
+  color: #f2f2f3;
+}
+
+.modal h2 {
+  margin-top: 0;
+}
+
+.modal label {
+  display: block;
+  margin: 0.5rem 0 0.2rem 0;
+}
+
+.modal input {
+  width: 100%;
+  padding: 0.5rem;
+  margin-bottom: 0.3rem;
+  border-radius: 8px;
+  border: 1px solid #2a2b2e;
+  background-color: #111;
+  color: #f2f2f3;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.modal-actions button {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid #2a2b2e;
+  background-color: #2b2d31;
+  color: #f2f2f3;
+  cursor: pointer;
+}
+
+.modal-actions button:hover {
+  background-color: #3a3c41;
+}
+
+.hidden {
+  display: none;
+}
