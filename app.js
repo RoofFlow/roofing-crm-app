@@ -13,21 +13,22 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentRole = 'user';
 
   // Fetch the current user and profile role from Supabase
-  async function getUserAndRole() {
-    const { data: { user } } = await supabase.auth.getUser();
-    currentUser = user;
-    currentRole = 'user';
-    if (user) {
-      const { data: profileData } = await supabase
-        .from('profile')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-      if (profileData && profileData.role) {
-        currentRole = profileData.role;
+    async function getUserAndRole() {
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUser = user;
+      currentRole = 'user';
+      if (user) {
+        // look up the profile by user_id (not id) to get the role
+        const { data: profileData } = await supabase
+          .from('profile')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        if (profileData && profileData.role) {
+          currentRole = profileData.role;
+        }
       }
     }
-  }
 
   const stages = ['new', 'inspection', 'estimate', 'insurance', 'job', 'complete'];
   const stageTitles = {
@@ -142,9 +143,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Open modal with lead details
-  function openLeadModal(lead) {
-    modal.classList.add('show');
-    // Fill fields
+    async function openLeadModal(lead) {
+      modal.classList.add('show');
+      // Fill fields
     document.getElementById('edit-id').value = lead.id;
     document.getElementById('edit-name').value = lead.name;
     document.getElementById('edit-phone').value = lead.phone;
@@ -167,21 +168,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const paymentStatusSelect = document.getElementById('edit-paymentStatus');
     if (paymentStatusSelect) paymentStatusSelect.value = lead.payment_status || 'Unpaid';
 
-    // Show existing contract link if available
-    const contractLink = document.getElementById('download-contract-link');
-    if (contractLink) {
-      if (lead.doc_url) {
-        const pub = supabase.storage.from('documents').getPublicUrl(lead.doc_url);
-        if (pub.data && pub.data.publicUrl) {
-          contractLink.href = pub.data.publicUrl;
-          contractLink.style.display = 'inline';
+      // Show existing contract link if available
+      const contractLink = document.getElementById('download-contract-link');
+      if (contractLink) {
+        if (lead.doc_url) {
+          try {
+            // For private buckets, create a signed URL
+            const { data: signed } = await supabase.storage.from('documents').createSignedUrl(lead.doc_url, 3600);
+            if (signed && signed.signedUrl) {
+              contractLink.href = signed.signedUrl;
+              contractLink.style.display = 'inline';
+            } else {
+              contractLink.style.display = 'none';
+            }
+          } catch (e) {
+            contractLink.style.display = 'none';
+          }
         } else {
           contractLink.style.display = 'none';
         }
-      } else {
-        contractLink.style.display = 'none';
       }
-    }
 
     // Load photos and crew assignments
     loadPhotos(lead.id);
@@ -323,27 +329,28 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const pdfDoc = await PDFLib.PDFDocument.create();
         for (const photo of photos) {
-          const { data: pub } = supabase.storage.from('Photos').getPublicUrl(photo.url);
-          if (pub && pub.publicUrl) {
-            const response = await fetch(pub.publicUrl);
-            const arrayBuffer = await response.arrayBuffer();
-            const imageBytes = new Uint8Array(arrayBuffer);
-            let image;
-            let dims;
-            if (photo.url.toLowerCase().endsWith('.png')) {
-              image = await pdfDoc.embedPng(imageBytes);
-              dims = image.scale(0.5);
-            } else {
-              image = await pdfDoc.embedJpg(imageBytes);
-              dims = image.scale(0.5);
+            // Get a signed URL for private photo
+            const { data: signed } = await supabase.storage.from('Photos').createSignedUrl(photo.url, 3600);
+            if (signed && signed.signedUrl) {
+              const response = await fetch(signed.signedUrl);
+              const arrayBuffer = await response.arrayBuffer();
+              const imageBytes = new Uint8Array(arrayBuffer);
+              let image;
+              let dims;
+              if (photo.url.toLowerCase().endsWith('.png')) {
+                image = await pdfDoc.embedPng(imageBytes);
+                dims = image.scale(0.5);
+              } else {
+                image = await pdfDoc.embedJpg(imageBytes);
+                dims = image.scale(0.5);
+              }
+              const page = pdfDoc.addPage([612, 792]);
+              const { width, height } = dims;
+              // Center image on page
+              const x = (612 - width) / 2;
+              const y = (792 - height) / 2;
+              page.drawImage(image, { x, y, width, height });
             }
-            const page = pdfDoc.addPage([612, 792]);
-            const { width, height } = dims;
-            // Center image on page
-            const x = (612 - width) / 2;
-            const y = (792 - height) / 2;
-            page.drawImage(image, { x, y, width, height });
-          }
         }
         const pdfBytes = await pdfDoc.save();
         const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' });
@@ -443,14 +450,18 @@ document.addEventListener('DOMContentLoaded', () => {
           name: 'Contract',
           url: docPath
         });
-        // Update link in modal
-        const { data: pub } = supabase.storage.from('documents').getPublicUrl(docPath);
-        const contractLink = document.getElementById('download-contract-link');
-        if (contractLink && pub && pub.publicUrl) {
-          contractLink.href = pub.publicUrl;
-          contractLink.style.display = 'inline';
-        }
-        alert('Contract generated.');
+          // Update link in modal using a signed URL for private bucket
+          try {
+            const { data: signed } = await supabase.storage.from('documents').createSignedUrl(docPath, 3600);
+            const contractLink = document.getElementById('download-contract-link');
+            if (contractLink && signed && signed.signedUrl) {
+              contractLink.href = signed.signedUrl;
+              contractLink.style.display = 'inline';
+            }
+          } catch (e) {
+            // ignore errors
+          }
+          alert('Contract generated.');
       } catch (err) {
         alert('Error generating contract: ' + err.message);
       }
@@ -495,18 +506,23 @@ document.addEventListener('DOMContentLoaded', () => {
     photoList.innerHTML = '';
     const { data: photos, error } = await supabase.from('photos').select('*').eq('lead_id', leadId);
     if (error || !photos) return;
-    for (const photo of photos) {
-      const { data: pub } = supabase.storage.from('Photos').getPublicUrl(photo.url);
-      if (pub && pub.publicUrl) {
-        const li = document.createElement('li');
-        const a = document.createElement('a');
-        a.href = pub.publicUrl;
-        a.textContent = photo.url.split('/').pop();
-        a.target = '_blank';
-        li.appendChild(a);
-        photoList.appendChild(li);
+      for (const photo of photos) {
+        try {
+          // Create a signed URL for private photo
+          const { data: signed } = await supabase.storage.from('Photos').createSignedUrl(photo.url, 3600);
+          if (signed && signed.signedUrl) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = signed.signedUrl;
+            a.textContent = photo.url.split('/').pop();
+            a.target = '_blank';
+            li.appendChild(a);
+            photoList.appendChild(li);
+          }
+        } catch (err) {
+          // ignore errors
+        }
       }
-    }
   }
 
   // Load crew assignments for a lead
