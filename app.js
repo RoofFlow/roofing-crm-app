@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           // Create a signed URL for private photo
           const { data: signed } = await supabase.storage.from('Photos').createSignedUrl(photo.url, 3600);
-          if (signed && signed.signed.signedUrl) {
+          if (signed && signed.signedUrl) {
             const li = document.createElement('li');
             const a = document.createElement('a');
             a.href = signed.signedUrl;
