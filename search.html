@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <eta charset="UTF-8"
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Roof Flow CRM - Search</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script defer src="config.js"></script>
+  <script defer src="supa.js"></script>
+  <script defer src="search.js"></script>
+</head>
+<body>
+  <header class="header">
+    <h1>Roof Flow CRM</h1>
+    <nav id="nav-menu">
+      <ul>
+        <li><a href="app.html">Dashboard</a></li>
+        <li><a href="search.html">Search</a></li>
+      </ul>
+    </nav>
+    <button id="sign-out">Sign out</button>
+  </header>
+  <div class="container">
+    <div class="toolbar">
+      <h2>Search Customers</h2>
+      <input type="text" id="search-input" placeholder="Enter name, phone or email">
+    </div>
+    <div id="search-results"></div>
+  </div>
+</body>
+</html>
