@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customer Details - Roof Flow CRM</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="manifest" href="manifest.json">
+  <script defer src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.6.0/dist/umd/supabase.min.js"></script>
+  <script defer src="config.js"></script>
+  <script defer src="supa.js"></script>
+  <script defer src="customer.js"></script>
+</head>
+<body>
+  <header class="header">
+    <h1>Roof Flow CRM</h1>
+    <nav id="nav-menu">
+      <ul>
+        <li><a href="app.html">Dashboard</a></li>
+        <li><a href="search.html">Search</a></li>
+      </ul>
+    </nav>
+    <button id="sign-out">Sign out</button>
+  </header>
+  <main>
+    <h2>Customer Details</h2>
+    <div id="customer-details" class="details-container">
+      <!-- details will be inserted by customer.js -->
+    </div>
+  </main>
+</body>
+</html>
