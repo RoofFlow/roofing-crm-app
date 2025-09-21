@@ -195,4 +195,27 @@ button:hover {
 #photo-list li,
 #crew-list li {
   margin-bottom: 0.25rem;
+
+
+/* Navigation menu as grey box buttons */
+#nav-menu ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+#nav-menu li a {
+  background-color: #2b2d31;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  color: #f2f2f3;
+  text-decoration: none;
+}
+
+#nav-menu li a:hover {
+  background-color: #3a3c41;
+}
 }
